@@ -40,16 +40,22 @@ def main(fname="sin(pi*x)"):
               "linear": "tab:red",
               "lin-origin": "tab:green"}
 
+    show_N = [2, 6, 20, 60]                       # ค่า N ที่จะยกมาโชว์ในตาราง
+    idx = [list(Ns).index(n) for n in show_N]     # ตำแหน่งของ N เหล่านั้นใน Ns
+
     fig, axes = plt.subplots(1, 2, figsize=(13, 5), sharey=True)  # 2 กราฟข้างกัน ใช้แกน y ร่วม
     for ax, sigma in zip(axes, sigmas):           # วนกราฟซ้าย(ไม่มี noise) และขวา(มี noise)
+        # หัวตาราง E_out แยกต่อเงื่อนไข noise (คัดลอกลงสไลด์หน้า 9 ได้)
+        print(f"\n=== Learning Curve (E_out)  f(x)={fname}, noise sigma={sigma} ===")
+        print("model        | " + " ".join(f"N={n:<7}" for n in show_N))
+        print("-" * (15 + 10 * len(show_N)))
         for name, fit in MODELS.items():          # วนแต่ละแบบจำลอง
             Ein, Eout = learning_curve(f, fit, Ns, sigma)   # คำนวณ learning curve
             ax.plot(Ns, Eout, "-",  color=colors[name], label=f"{name} Eout")  # เส้นทึบ = E_out
             ax.plot(Ns, Ein,  "--", color=colors[name], alpha=0.6,
                     label=f"{name} Ein")          # เส้นประ = E_in
-            # พิมพ์สรุป E_out ที่ข้อมูลน้อยสุด(N=2) กับมากสุด(N=60)
-            print(f"sigma={sigma}  {name:<10}  "
-                  f"Eout(N=2)={Eout[0]:.3f}  Eout(N=60)={Eout[-1]:.3f}")
+            # พิมพ์ค่า E_out ที่ N ต่าง ๆ เป็นแถวตาราง
+            print(f"{name:<12} | " + " ".join(f"{Eout[k]:9.3f}" for k in idx))
         if sigma > 0:                             # ถ้ามี noise ให้ลากเส้นขีดจำกัดล่าง (noise floor)
             ax.axhline(sigma**2, color="k", ls=":", lw=1,
                        label=f"noise floor σ²={sigma**2:.2f}")

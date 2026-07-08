@@ -53,17 +53,18 @@ def analytical(f, fit):
 
 def main():
     fig, axes = plt.subplots(2, 3, figsize=(15, 8))    # เตรียมตาราง 2 แถว(เป้าหมาย) x 3 คอลัมน์(แบบจำลอง)
-    # พิมพ์หัวตารางผลลัพธ์ (เทียบ analytical กับ simulation)
-    print(f"{'target':<10} {'model':<11} | {'bias(ana)':>9} {'bias(sim)':>9} | "
-          f"{'var(ana)':>9} {'var(sim)':>9} | {'Eout':>7}")
-    print("-" * 78)
 
     for i, (fname, f) in enumerate(TARGETS.items()):   # วนแต่ละฟังก์ชันเป้าหมาย (แถว i)
+        # พิมพ์หัวตารางแยกต่อฟังก์ชันเป้าหมาย (คัดลอกลงสไลด์ได้ทีละตาราง)
+        print(f"\n=== ฟังก์ชันเป้าหมาย: {fname} ===")
+        print(f"{'model':<12} | {'Bias²(ana)':>10} {'Bias²(sim)':>10} | "
+              f"{'Var(ana)':>9} {'Var(sim)':>9} | {'Eout':>7}")
+        print("-" * 68)
         for j, (mname, fit) in enumerate(MODELS.items()):  # วนแต่ละแบบจำลอง (คอลัมน์ j)
             b_ana, v_ana = analytical(f, fit)          # หา bias/var ด้วยวิธีอินทิเกรต
             b_sim, v_sim, xs, gbar, G = simulate(f, fit)   # หา bias/var ด้วยวิธีสุ่มจำลอง
             # พิมพ์ผลเทียบสองวิธี + Eout = bias + variance (error คาดหวังนอกชุดฝึก)
-            print(f"{fname:<10} {mname:<11} | {b_ana:9.4f} {b_sim:9.4f} | "
+            print(f"{mname:<12} | {b_ana:10.4f} {b_sim:10.4f} | "
                   f"{v_ana:9.4f} {v_sim:9.4f} | {b_ana+v_ana:7.4f}")
 
             ax = axes[i, j]                            # เลือกช่องกราฟของคู่ (เป้าหมาย, แบบจำลอง) นี้
