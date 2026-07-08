@@ -1,87 +1,68 @@
 # -*- coding: utf-8 -*-
 """
-ส่วนที่ 3: Learning Curves เปรียบเทียบ 3 แบบจำลอง
-    - แกน x: จำนวนตัวอย่างฝึก N
-    - แกน y: ค่าเฉลี่ยของ E_in (error บนชุดฝึก) และ E_out (error จริง)
-    - ทดลอง 2 เงื่อนไข: ไม่มี noise และมี noise ~ N(0, sigma^2)
+ส่วนที่ 3: Learning Curves เปรียบเทียบ 3 แบบจำลอง (จาก models.py)
+  แกน x: จำนวนตัวอย่างฝึก N   แกน y: E_in (ชุดฝึก) และ E_out (จริง)
+  ทดลอง 2 เงื่อนไข: ไม่มี noise และมี noise ~ N(0, sigma^2)
 
-E_out ประมาณด้วย MSE บน grid ละเอียดของ x (คือค่าคาดหวังเหนือ x จริง ๆ)
-หมายเหตุ 1: เมื่อมี noise ค่า E_out ที่ดีที่สุดที่เป็นไปได้คือ sigma^2 (noise floor)
-หมายเหตุ 2: linear + noise ที่ N=2 ค่าเฉลี่ย E_out จะระเบิดได้
-             เพราะบางรอบสุ่มได้ x1 ใกล้ x2 มาก -> ความชัน (y2-y1)/(x2-x1)
-             พุ่งสูงมาก นี่คือ "variance สูง" ของแบบจำลองซับซ้อนเมื่อข้อมูลน้อย
-             (ในกราฟค่าพวกนี้จะหลุดกรอบ ylim ออกไปเอง)
+หมายเหตุ: linear + noise ที่ N=2 ค่า E_out จะระเบิดได้ (variance สูงเมื่อข้อมูลน้อย)
+          เพราะบางรอบ x1 ใกล้ x2 มาก -> ความชันพุ่งสูง (ค่าจะหลุดกรอบ ylim)
 """
 
-import numpy as np
-import matplotlib.pyplot as plt
+import numpy as np                                # ไลบรารีคำนวณเชิงตัวเลข
+import matplotlib.pyplot as plt                   # ไลบรารีวาดกราฟ
+from models import MODELS, TARGETS, predict       # ดึงแบบจำลอง เป้าหมาย และฟังก์ชันทำนายจากโมดูลกลาง
 
-rng = np.random.default_rng(0)
+rng = np.random.default_rng(0)                    # ตัวสุ่ม seed=0 (ผลซ้ำได้)
 
-# ---------- แบบจำลองทั้ง 3 (fit ด้วย lstsq = normal equation) ----------
-def fit_const(x, y):
-    w = np.linalg.lstsq(np.ones((len(x), 1)), y, rcond=None)[0]
-    return np.array([0.0, w[0]])                    # (a, b)
 
-def fit_linear(x, y):
-    X = np.column_stack([x, np.ones(len(x))])
-    w = np.linalg.lstsq(X, y, rcond=None)[0]
-    return np.array([w[0], w[1]])
-
-def fit_linear_origin(x, y):
-    w = np.linalg.lstsq(x.reshape(-1, 1), y, rcond=None)[0]
-    return np.array([w[0], 0.0])
-
-MODELS = {"constant":   fit_const,
-          "linear":     fit_linear,
-          "lin-origin": fit_linear_origin}
-
-f = lambda x: np.sin(np.pi * x)        # ฟังก์ชันเป้าหมาย (เปลี่ยนเป็น x**2 ได้)
-
-# ---------- ทดลอง 1 เงื่อนไข noise แล้วคืน learning curve ----------
-def learning_curve(fit, Ns, sigma=0.0, trials=3000):
-    """คืนค่า (Ein เฉลี่ย, Eout เฉลี่ย) สำหรับแต่ละ N ใน Ns"""
-    xs = np.linspace(-1, 1, 400)                  # grid สำหรับวัด E_out
-    Ein, Eout = [], []
-    for N in Ns:
-        ein = eout = 0.0
-        for _ in range(trials):
+def learning_curve(f, fit, Ns, sigma=0.0, trials=3000):
+    """คืน (Ein เฉลี่ย, Eout เฉลี่ย) สำหรับแต่ละ N ใน Ns"""
+    xs = np.linspace(-1, 1, 400)                  # กริดจุด x ไว้วัด E_out (ค่าคาดหวังนอกชุดฝึก)
+    Ein, Eout = [], []                            # ลิสต์เก็บ error เฉลี่ยของแต่ละขนาดชุดฝึก N
+    for N in Ns:                                  # วนทดลองทีละขนาดชุดฝึก
+        ein = eout = 0.0                          # ตัวสะสม error ไว้เฉลี่ยตอนจบ
+        for _ in range(trials):                   # ทำซ้ำหลายรอบเพื่อเฉลี่ยความสุ่ม
             x = rng.uniform(-1, 1, N)             # สุ่มชุดฝึก N จุด
-            y = f(x) + sigma * rng.standard_normal(N)   # ใส่ noise
-            a, b = fit(x, y)
-            ein  += np.mean((a * x + b - y) ** 2)         # error บนชุดฝึก
-            eout += np.mean((a * xs + b - f(xs)) ** 2)    # error เทียบ f จริง
-        Ein.append(ein / trials)
-        Eout.append(eout / trials)
+            y = f(x) + sigma * rng.standard_normal(N)   # ค่าจริง + noise แบบเกาส์เซียน
+            theta = fit(x, y)                     # fit แบบจำลองได้พารามิเตอร์ (a,b)
+            ein  += np.mean((predict(theta, x) - y) ** 2)       # E_in: error บนชุดฝึก (เทียบ y ที่มี noise)
+            eout += np.mean((predict(theta, xs) - f(xs)) ** 2)  # E_out: error เทียบฟังก์ชันจริงบนกริด
+        Ein.append(ein / trials)                  # เฉลี่ย E_in ของขนาด N นี้
+        Eout.append(eout / trials)                # เฉลี่ย E_out ของขนาด N นี้
     return np.array(Ein), np.array(Eout)
 
-# ---------- รันและวาดรูป ----------
-if __name__ == "__main__":
-    Ns = np.arange(2, 61, 2)
-    sigmas = [0.0, 0.3]                            # ไม่มี noise / มี noise
-    colors = {"constant": "tab:blue",
+
+def main(fname="sin(pi*x)"):
+    f = TARGETS[fname]                            # เลือกฟังก์ชันเป้าหมายตามชื่อ
+    Ns = np.arange(2, 61, 2)                      # ขนาดชุดฝึกที่ทดลอง: 2, 4, 6, ..., 60
+    sigmas = [0.0, 0.3]                           # สองเงื่อนไข: ไม่มี noise / มี noise sigma=0.3
+    colors = {"constant": "tab:blue",            # กำหนดสีประจำแต่ละแบบจำลอง
               "linear": "tab:red",
               "lin-origin": "tab:green"}
 
-    fig, axes = plt.subplots(1, 2, figsize=(13, 5), sharey=True)
-
-    for ax, sigma in zip(axes, sigmas):
-        for name, fit in MODELS.items():
-            Ein, Eout = learning_curve(fit, Ns, sigma)
-            ax.plot(Ns, Eout, "-",  color=colors[name], label=f"{name} Eout")
+    fig, axes = plt.subplots(1, 2, figsize=(13, 5), sharey=True)  # 2 กราฟข้างกัน ใช้แกน y ร่วม
+    for ax, sigma in zip(axes, sigmas):           # วนกราฟซ้าย(ไม่มี noise) และขวา(มี noise)
+        for name, fit in MODELS.items():          # วนแต่ละแบบจำลอง
+            Ein, Eout = learning_curve(f, fit, Ns, sigma)   # คำนวณ learning curve
+            ax.plot(Ns, Eout, "-",  color=colors[name], label=f"{name} Eout")  # เส้นทึบ = E_out
             ax.plot(Ns, Ein,  "--", color=colors[name], alpha=0.6,
-                    label=f"{name} Ein")
+                    label=f"{name} Ein")          # เส้นประ = E_in
+            # พิมพ์สรุป E_out ที่ข้อมูลน้อยสุด(N=2) กับมากสุด(N=60)
             print(f"sigma={sigma}  {name:<10}  "
                   f"Eout(N=2)={Eout[0]:.3f}  Eout(N=60)={Eout[-1]:.3f}")
-        if sigma > 0:                              # เส้น noise floor
+        if sigma > 0:                             # ถ้ามี noise ให้ลากเส้นขีดจำกัดล่าง (noise floor)
             ax.axhline(sigma**2, color="k", ls=":", lw=1,
                        label=f"noise floor σ²={sigma**2:.2f}")
-        ax.set_title(f"f(x)=sin(pi*x),  noise sigma={sigma}")
-        ax.set_xlabel("N (training set size)")
-        ax.set_ylim(0, 1.2)
-        ax.legend(fontsize=8)
-    axes[0].set_ylabel("Mean Squared Error")
+        ax.set_title(f"f(x)={fname},  noise sigma={sigma}")  # ชื่อกราฟบอกเงื่อนไข
+        ax.set_xlabel("N (training set size)")    # ป้ายแกน x
+        ax.set_ylim(0, 1.2)                        # จำกัดแกน y (ค่าที่ระเบิดจะหลุดกรอบไปเอง)
+        ax.legend(fontsize=8)                      # คำอธิบายเส้น
+    axes[0].set_ylabel("Mean Squared Error")       # ป้ายแกน y (ใส่แค่กราฟซ้าย)
 
-    plt.tight_layout()
-    plt.savefig("learning_curves.png", dpi=120)
+    plt.tight_layout()                            # จัดระยะไม่ให้ทับกัน
+    plt.savefig("learning_curves.png", dpi=120)   # บันทึกรูป
     print("\nบันทึกรูป learning_curves.png แล้ว")
+
+
+if __name__ == "__main__":                        # รันเฉพาะเมื่อสั่งไฟล์นี้ตรง ๆ
+    main()
