@@ -250,7 +250,8 @@ MSE = mean( (ค่าประมาณ − E_out จริง)² ) ≈ bias² 
         <h2>bias / variance / MSE จากการทำซ้ำหลายชุด</h2>
         <p class="muted">ทำซ้ำ M ชุดข้อมูล เก็บค่าประมาณของแต่ละวิธี แล้วดูการกระจาย (histogram)
           เทียบเส้นประ <b>E_out จริง</b> — กว้าง = variance สูง, เยื้องจากเส้นประ = bias</p>
-        <div class="grid2" style="margin-top:16px">
+        <h3 style="margin-top:8px">รูปรวม — ซ้อน 3 วิธีในภาพเดียว</h3>
+        <div class="grid2" style="margin-top:8px">
           <div class="chart-card">
             <p class="chart-title">model = constant</p>
             <canvas id="cv-b-const" width="600" height="360"></canvas>
@@ -265,6 +266,27 @@ MSE = mean( (ค่าประมาณ − E_out จริง)² ) ≈ bias² 
           <span><span class="swatch" style="background:var(--holdout)"></span>holdout</span>
           <span><span class="swatch" style="background:var(--kfold)"></span>kfold</span>
           <span><span class="swatch" style="background:var(--true);width:16px;height:3px"></span>true E_out</span>
+        </div>
+
+        <h3 style="margin-top:24px">แยกทีละวิธี — สเกลแกนเดียวกันในแต่ละโมเดล</h3>
+        <p class="muted" style="font-size:13.5px;margin-top:4px">รูปรวมด้านบนดูภาพกว้างได้เร็ว ส่วนด้านล่างแยกทีละวิธี
+          <b>บนแกน x/y เดียวกัน</b> จึงเทียบตรง ๆ ได้: ยิ่ง <b>เตี้ยกว้าง</b> = variance สูง (เหวี่ยง),
+          ยอด <b>เยื้องจากเส้นประ</b> = bias (เอนเอียง)</p>
+
+        <p class="chart-title" style="margin-top:14px">model = constant</p>
+        <div class="grid3" style="margin-top:6px">
+          <div class="chart-card"><p class="chart-title"><span class="pill p-resub">resub</span></p><canvas id="cv-b-const-resub" width="600" height="280"></canvas></div>
+          <div class="chart-card"><p class="chart-title"><span class="pill p-hold">holdout</span></p><canvas id="cv-b-const-hold" width="600" height="280"></canvas></div>
+          <div class="chart-card"><p class="chart-title"><span class="pill p-kf">kfold</span></p><canvas id="cv-b-const-kf" width="600" height="280"></canvas></div>
+        </div>
+        <p class="chart-title" style="margin-top:16px">model = linear</p>
+        <div class="grid3" style="margin-top:6px">
+          <div class="chart-card"><p class="chart-title"><span class="pill p-resub">resub</span></p><canvas id="cv-b-lin-resub" width="600" height="280"></canvas></div>
+          <div class="chart-card"><p class="chart-title"><span class="pill p-hold">holdout</span></p><canvas id="cv-b-lin-hold" width="600" height="280"></canvas></div>
+          <div class="chart-card"><p class="chart-title"><span class="pill p-kf">kfold</span></p><canvas id="cv-b-lin-kf" width="600" height="280"></canvas></div>
+        </div>
+        <div class="legend" style="margin:12px 0 4px;justify-content:center">
+          <span><span class="swatch" style="background:var(--true);width:16px;height:3px"></span>เส้นประ = true E_out (ระยะห่างจากยอด = bias)</span>
         </div>
         <div class="tbl-wrap">
           <table id="tbl-b">
@@ -792,27 +814,42 @@ function fmtTick(v){
   return (Math.round(v * 100) / 100).toString();
 }
 
-// ---- histogram ซ้อนหลายชุด + เส้นแนวตั้ง ----
-function drawHist(cv, series, vline){
-  const { ctx, W, H } = setupCanvas(cv);
-  const pad = { l: 46, r: 12, t: 12, b: 40 };
+const HIST_BINS = 40;
+// คำนวณโดเมน x และ ymax ร่วม จากหลายชุด — ใช้บังคับให้รูปรวม/รูปแยก อยู่บนสเกลเดียวกัน
+function histDomain(series, vline){
   let lo = Infinity, hi = -Infinity;
   series.forEach(s => s.data.forEach(v => { if (v < lo) lo = v; if (v > hi) hi = v; }));
   if (vline != null){ lo = Math.min(lo, vline); hi = Math.max(hi, vline); }
   if (!(hi > lo)){ hi = lo + 1; }
   const pad2 = (hi - lo) * 0.04; lo -= pad2; hi += pad2;
-  const BINS = 40, bw = (hi - lo) / BINS;
+  const bw = (hi - lo) / HIST_BINS;
   let ymax = 0;
+  series.forEach(s => {
+    const c = new Int32Array(HIST_BINS);
+    s.data.forEach(v => { let b = Math.floor((v - lo) / bw); if (b < 0) b = 0; if (b >= HIST_BINS) b = HIST_BINS - 1; c[b]++; });
+    for (let i = 0; i < HIST_BINS; i++) if (c[i] > ymax) ymax = c[i];
+  });
+  return { lo, hi, ymax: ymax * 1.08 };
+}
+
+// ---- histogram ซ้อนหลายชุด + เส้นแนวตั้ง ----
+// opt.domain = {lo,hi,ymax} เพื่อบังคับสเกลร่วม (ไม่ส่ง = คำนวณเอง)
+function drawHist(cv, series, vline, opt){
+  opt = opt || {};
+  const { ctx, W, H } = setupCanvas(cv);
+  const pad = { l: 46, r: 12, t: 12, b: 40 };
+  const dom = opt.domain || histDomain(series, vline);
+  const lo = dom.lo, hi = dom.hi, ymax = dom.ymax;
+  const BINS = HIST_BINS, bw = (hi - lo) / BINS;
   const hists = series.map(s => {
     const c = new Int32Array(BINS);
     s.data.forEach(v => { let b = Math.floor((v - lo) / bw); if (b < 0) b = 0; if (b >= BINS) b = BINS - 1; c[b]++; });
-    for (let i = 0; i < BINS; i++) if (c[i] > ymax) ymax = c[i];
     return c;
   });
-  ymax *= 1.08;
   const { px, py } = axes(ctx, pad, W, H, [lo, hi], [0, ymax], 'estimated E_out', 'frequency');
+  const alpha = series.length === 1 ? 0.8 : 0.45;         // รูปแยกทึบกว่าเพื่อดูรูปร่างชัด
   series.forEach((s, si) => {
-    ctx.fillStyle = s.color; ctx.globalAlpha = 0.45;
+    ctx.fillStyle = s.color; ctx.globalAlpha = alpha;
     const h = hists[si];
     for (let b = 0; b < BINS; b++){
       if (h[b] === 0) continue;
@@ -967,11 +1004,16 @@ function runAB(){
     const fit = MODELS[name];
     const res = runTrials(fit, P.n, P.sigma, P.ratio, P.k, rngB, P.M);
     const trueMean = mean(res.true);
-    drawHist(cv, [
-      { data: res.resub, color: COL.resub },
-      { data: res.hold,  color: COL.holdout },
-      { data: res.kf,    color: COL.kfold }
-    ], trueMean);
+    const sResub = { data: res.resub, color: COL.resub };
+    const sHold  = { data: res.hold,  color: COL.holdout };
+    const sKf    = { data: res.kf,    color: COL.kfold };
+    const dom = histDomain([sResub, sHold, sKf], trueMean);   // สเกลร่วม รูปรวม+รูปแยก
+    drawHist(cv, [sResub, sHold, sKf], trueMean, { domain: dom });
+    // รูปแยกทีละวิธี บนแกนเดียวกัน (id: cv-b-const-* / cv-b-lin-*)
+    const pre = name === 'constant' ? 'cv-b-const' : 'cv-b-lin';
+    drawHist($(pre + '-resub'), [sResub], trueMean, { domain: dom });
+    drawHist($(pre + '-hold'),  [sHold],  trueMean, { domain: dom });
+    drawHist($(pre + '-kf'),    [sKf],    trueMean, { domain: dom });
     const rows = [['resub', res.resub], ['holdout', res.hold], ['kfold', res.kf]];
     rows.forEach(([m, est], i) => {
       const s = statsVsTrue(est, res.true);
