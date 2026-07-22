@@ -219,18 +219,23 @@ def part_d(rng):
         print(f"{d:>3} | {maxw[d]:12.3f} {e_cv[d]:9.4f}")
     print("สังเกต: ดีกรีสูง -> max|w| โตแบบระเบิด (สัมประสิทธิ์บวก/ลบใหญ่หักล้างกันเพื่อลากผ่านทุกจุด)")
 
-    # --- วาด max|w| (แกน log) คู่กับ E_cv เทียบดีกรี ---
+    # --- วาดแยก 2 กราฟข้างกัน: (ซ้าย) max|w|  (ขวา) E_cv  ทั้งคู่แกน log ให้เห็นการไต่ขึ้น ---
     degs = np.arange(MAXDEG + 1)
-    fig, ax1 = plt.subplots(figsize=(7.5, 4.5))
-    ax1.plot(degs, maxw, "o-", color="tab:purple", label="max|w|")
-    ax1.set_yscale("log")
-    ax1.set_xlabel("degree d"); ax1.set_ylabel("max |w| (log scale)", color="tab:purple")
-    ax1.tick_params(axis="y", labelcolor="tab:purple")
-    ax2 = ax1.twinx()                              # แกน y ที่สองสำหรับ E_cv
-    ax2.plot(degs, e_cv, "s--", color="tab:blue", label="E_cv")
-    ax2.set_ylabel("E_cv", color="tab:blue")
-    ax2.tick_params(axis="y", labelcolor="tab:blue")
-    ax1.set_title("(d) coefficient magnitude vs degree (overfitting signal)")
+    fig, (axL, axR) = plt.subplots(1, 2, figsize=(11, 4.5))
+
+    axL.plot(degs, maxw, "o-", color="tab:purple")   # ซ้าย: ขนาดสัมประสิทธิ์
+    axL.set_yscale("log")
+    axL.set_xlabel("degree d"); axL.set_ylabel("max |w| (log scale)")
+    axL.set_title("(d1) coefficient magnitude vs degree")
+    axL.grid(True, ls="--", alpha=0.4)
+
+    axR.plot(degs, e_cv, "s--", color="tab:blue")     # ขวา: cross-validation error
+    axR.set_yscale("log")
+    axR.set_xlabel("degree d"); axR.set_ylabel("E_cv (log scale)")
+    axR.set_title("(d2) cross-validation error vs degree")
+    axR.grid(True, ls="--", alpha=0.4)
+
+    fig.suptitle("(d) exploding |w| tracks exploding E_cv  (overfitting signal)")
     plt.tight_layout()
     plt.savefig("coef_growth.png", dpi=120)
     print("สรุป: |w| ที่พุ่งสูง = สัญญาณ overfitting; regularization คุมขนาด w เพื่อกันอาการนี้")
