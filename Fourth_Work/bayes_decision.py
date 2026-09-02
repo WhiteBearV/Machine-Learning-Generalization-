@@ -88,32 +88,38 @@ def plot_case(mu_p, sigma_p, pi_p, mu_m, sigma_m, pi_m, boundaries, title, fname
     plt.close(fig)
 
 
-def run(mode):
+def run(mode, sigma_minus_true, case_name):
     pi_m = 1 - PI_PLUS
 
     if mode == "fixed":
-        mu_p, sigma_p, mu_m, sigma_m = MU_PLUS, SIGMA_PLUS, MU_MINUS, SIGMA_MINUS
+        mu_p, sigma_p, mu_m, sigma_m = MU_PLUS, SIGMA_PLUS, MU_MINUS, sigma_minus_true
     else:  # mode == "sampled": สุ่มตัวอย่างแล้วประมาณค่าพารามิเตอร์กลับมา
         rng = np.random.default_rng(SEED)
         samples_p = rng.normal(MU_PLUS, SIGMA_PLUS, N_SAMPLES)
-        samples_m = rng.normal(MU_MINUS, SIGMA_MINUS, N_SAMPLES)
+        samples_m = rng.normal(MU_MINUS, sigma_minus_true, N_SAMPLES)
         mu_p, sigma_p = estimate_gaussian(samples_p)
         mu_m, sigma_m = estimate_gaussian(samples_m)
 
     kind = "LDA (linear)" if abs(sigma_p - sigma_m) < 1e-9 else "QDA (quadratic)"
     boundaries = decision_boundary(mu_p, sigma_p, PI_PLUS, mu_m, sigma_m, pi_m)
 
-    print(f"[{mode}] {kind}: mu_plus={mu_p:.3f}, sigma_plus={sigma_p:.3f}, "
+    print(f"[{case_name}/{mode}] {kind}: mu_plus={mu_p:.3f}, sigma_plus={sigma_p:.3f}, "
           f"mu_minus={mu_m:.3f}, sigma_minus={sigma_m:.3f} "
           f"-> decision boundary x* = {boundaries}")
 
     plot_case(mu_p, sigma_p, PI_PLUS, mu_m, sigma_m, pi_m, boundaries,
-              f"{kind} - {mode} params", f"{mode}.png")
+              f"{kind} - {case_name} - {mode} params", f"{case_name}_{mode}.png")
 
 
 def main():
-    run("fixed")
-    run("sampled")
+    # ข้อ 1,4: sigma เท่ากัน -> LDA (เชิงเส้น) | ข้อ 2,3: sigma ไม่เท่ากัน -> QDA (กำลังสอง)
+    cases = [
+        ("equal_var_LDA", SIGMA_PLUS),
+        ("unequal_var_QDA", SIGMA_MINUS),
+    ]
+    for case_name, sigma_minus_true in cases:
+        run("fixed", sigma_minus_true, case_name)
+        run("sampled", sigma_minus_true, case_name)
 
 
 if __name__ == "__main__":
