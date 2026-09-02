@@ -1,5 +1,15 @@
+# Python
 .venv/
-__pycache__/
 venv/
-.pdf/
-.xlsx/
+__pycache__/
+
+# Images
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+
+# Documents
+*.pdf
+*.xlsx
