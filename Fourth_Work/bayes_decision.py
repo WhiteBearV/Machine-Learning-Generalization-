@@ -82,6 +82,8 @@ def plot_case(mu_p, sigma_p, pi_p, mu_m, sigma_m, pi_m, boundaries, title, fname
     for ax in (ax1, ax2):
         for b in boundaries:
             ax.axvline(b, color="k", linestyle="--", linewidth=1)
+        ax.set_xlim(X_MIN, X_MAX)
+        ax.set_ylim(0, 1)
 
     fig.tight_layout()
     fig.savefig(fname, dpi=120)
